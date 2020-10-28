@@ -1,0 +1,59 @@
+const Web3 = require('web3');           //for web3 calls
+const Tx = require('ethereumjs-tx');    //for Tx calls
+
+ //this will directly communicate with ropsten
+ // Previous video check how to get this api " Vr1GWcLG0XzcdrZHWMPu "
+const web3 = new Web3(new Web3.providers.HttpProvider("https://ropsten.infura.io/Vr1GWcLG0XzcdrZHWMPu"));
+
+const account = '0x6814b126eEbeED353A8D9e1bDCaC422f6F0A339e'; // account address
+
+// private key
+const privateKey = Buffer.from('a3c0074742371bfbfa3b2ffae0cac027ab1dcecb49fa0c7ea34f640aa89b3dd4', 'hex');
+const contractAddress = '0x2f48444912e2aa6bdfc51798dcce61941638f20a'; // Deployed manually
+const abi = [{"constant":true,"inputs":[],"name":"a","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_a","type":"uint256"}],"name":"set","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"get","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}];
+
+// interface for contract
+const contract = new web3.eth.Contract(abi, contractAddress, {
+  from: account,
+  gasLimit: 3000000,
+});
+
+
+const contractFunction = contract.methods.set(10); // contract params
+
+const functionAbi = contractFunction.encodeABI(); // this will generate contract function abi code
+
+console.log("Getting gas estimate");
+
+// this is gas estimation part, it will said you transaction gasAmmount
+contractFunction.estimateGas({from: account}).then((gasAmount) => {
+  estimatedGas = gasAmount.toString(16);
+
+  console.log("Estimated gas: " + estimatedGas);
+
+  web3.eth.getTransactionCount(account).then(_nonce => { //this will generate Nonce
+    nonce = _nonce.toString(16);
+
+    console.log("Nonce: " + nonce);
+    const txParams = {
+      gasPrice: estimatedGas,
+      gasLimit: 3000000,
+      to: contractAddress,
+      data: functionAbi,
+      from: account,
+      nonce: '0x' + nonce
+    };
+
+    const tx = new Tx(txParams);
+    tx.sign(privateKey);          // here Tx sign with private key
+
+    const serializedTx = tx.serialize();
+
+    contract.methods.get().call().then(v => console.log("Value before increment: " + v)); //simple contract call
+    // here performing singedTransaction 
+    web3.eth.sendSignedTransaction('0x' + serializedTx.toString('hex')).on('receipt', receipt => {
+      console.log(receipt);
+      contract.methods.get().call().then(v => console.log("Value after increment: " + v));
+    })
+  });
+});
